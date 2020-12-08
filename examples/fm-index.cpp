@@ -81,15 +81,15 @@ int main(int argc, char **argv)
         store_to_file(rev_fm_index, rev_index_file);     // save it
     }
 
-    string temp = "bcd";
+    //string temp = "bcd";
     // size_t s, l_fwd_res, r_fwd_res, l_bwd_res, r_bwd_res;
     // string::iterator begin = temp.begin();
     // string::iterator end = temp.end();
 
-    string::iterator begin = temp.begin();
-    size_t count = 0, size = 0;
-    size_t leftB , rightB , leftRevB , rightRevB, leftBRes , rightBRes , leftRevBRes , rightRevBRes,leftBSave=0 , rightBSave=0 , leftRevBSave=0 , rightRevBSave=0;
-    size = bidirectional_search_forward(fm_index, rev_fm_index, 0, fm_index.size() - 1, 0, rev_fm_index.size() - 1, begin, begin + 1, leftB, rightB, leftRevB, rightRevB);
+    //string::iterator begin = temp.begin();
+    //size_t count = 0, size = 0;
+    //size_t leftB , rightB , leftRevB , rightRevB, leftBRes , rightBRes , leftRevBRes , rightRevBRes,leftBSave=0 , rightBSave=0 , leftRevBSave=0 , rightRevBSave=0;
+    //size = bidirectional_search_forward(fm_index, rev_fm_index, 0, fm_index.size() - 1, 0, rev_fm_index.size() - 1, begin, begin + 1, leftB, rightB, leftRevB, rightRevB);
     // bidirectional_search(fm_index, 0, fm_index.size() - 1, 0, fm_index.size() - 1, 'b', l_fwd_res, r_fwd_res, l_bwd_res, r_bwd_res);
 
     cout << "Input search terms and press Ctrl-D to exit." << endl;
@@ -99,7 +99,14 @@ int main(int argc, char **argv)
     while (getline(cin, query))
     {
         size_t m = query.size();
-        size_t occs = sdsl::count(fm_index, query.begin(), query.end());
+        size_t occs;
+        switch (error_num){ 
+            case 1:
+                occs = sdsl::count_one_error(fm_index, query.begin(), query.end(), m );
+                break;
+            default:
+                occs = sdsl::count(fm_index, query.begin(), query.end());
+        }
         cout << "# of occurrences: " << occs << endl;
         if (occs > 0)
         {
