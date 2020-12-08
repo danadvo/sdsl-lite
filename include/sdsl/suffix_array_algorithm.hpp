@@ -20,6 +20,7 @@
 */
 #ifndef INCLUDED_SDSL_SUFFIX_ARRAY_ALGORITHM
 #define INCLUDED_SDSL_SUFFIX_ARRAY_ALGORITHM
+#define SDSL_UNUSED
 
 #include <iterator>
 #include "suffix_array_helper.hpp"
@@ -658,6 +659,35 @@ typename t_csa::string_type extract(
     return result;
 }
 
+template<class t_csa, class t_pat_iter>
+typename t_csa::size_type count_one_error(const t_csa& csa,t_pat_iter begin,t_pat_iter end, size_t m){
+    typename t_csa::size_type x = (m+1)/2;
+
+    if (end - begin > (typename std::iterator_traits<t_pat_iter>::difference_type)csa.size())
+        return 0;
+
+    //case A:
+    typename t_csa::char_type curr_char;
+    typename t_csa::size_type left_res, right_res, left_err_res, right_err_res, result =0;
+    //find SA of right half P[x...m]
+    backward_search(csa, 0, csa.size()-1, begin+x, end, left_res, right_res);
+    if (left_res<=right_res){
+        //for each curr_char at index i in P[0...x-1]  
+        for (size_t i=x-1 ; i>=0 && i<x ; i--){ 
+            curr_char = (typename t_csa::char_type)*(begin+i);
+            //check existence of P[0...i-1]<<j<<P[i+1...m] s.t j!=i, j in alphabet
+            for(size_t j=1; j<csa.sigma; j++ ){ 
+                if(csa.char2comp[curr_char] != j){ 
+                    backward_search(csa, left_res , right_res, csa.comp2char[j], left_err_res, right_err_res);
+                    result+= backward_search(csa, left_err_res, right_err_res, begin, begin+i, left_err_res, right_err_res);
+                }
+            }
+            //return char at j index in P to the original one
+            backward_search(csa,left_res,right_res,curr_char,left_res,right_res);
+        }
+    }
+    return result;
+}
 
 } // end namespace
 #endif
