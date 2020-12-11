@@ -9,20 +9,22 @@ using namespace sdsl;
 using namespace std;
 
 template <class t_csa, class t_rac, class t_pat_iter>
-typename t_csa::size_type count_one_error_case(const t_csa &csa, t_pat_iter begin, t_pat_iter end, size_t m, bool include_middle, bool case_a, t_rac &locations, bool locate)
+typename t_csa::size_type count_one_error_case(const t_csa &csa,typename t_csa::size_type left_window, typename t_csa::size_type right_window,
+                                            t_pat_iter begin, t_pat_iter end, bool include_middle, bool case_a, t_rac &locations, bool locate)
 {
+    typename t_csa::size_type m = end - begin;
     typename t_csa::size_type x = (m + 1) / 2;
     if (!include_middle)
         x--;
 
-    if (end - begin > (typename std::iterator_traits<t_pat_iter>::difference_type)csa.size())
+    if ( end - begin > (typename std::iterator_traits<t_pat_iter>::difference_type)csa.size())
         return 0;
 
     typename t_csa::char_type curr_char;
     typename t_csa::size_type left_res = 0, right_res = 0, left_err_res = 0, right_err_res = 0, result = 0, i = 0, occs = 0;
     size_t locations_size;
     //find SA of right half P[x...m]
-    backward_search(csa, 0, csa.size() - 1, begin + x, end, left_res, right_res);
+    backward_search(csa, left_window, right_window, begin + x, end, left_res, right_res);
 
     if (left_res <= right_res)
     {
@@ -48,7 +50,7 @@ typename t_csa::size_type count_one_error_case(const t_csa &csa, t_pat_iter begi
                             if (case_a)
                                 locations[locations_size + k] = csa[left_err_res + k];
                             else
-                                locations[locations_size + k] = csa.size() - 1- csa[left_err_res + k] - m;
+                                locations[locations_size + k] = csa.size() -1 - csa[left_err_res + k] - m;
                         }
                     }
                 }
@@ -58,6 +60,26 @@ typename t_csa::size_type count_one_error_case(const t_csa &csa, t_pat_iter begi
         }
     }
     return result;
+}
+
+template <class t_csa, class t_rac, class t_pat_iter>
+typename t_csa::size_type
+handle_one_error(
+    const t_csa &csa,
+    const t_csa &rev_csa,
+    typename t_csa::size_type left_window,
+    typename t_csa::size_type right_window,
+    t_pat_iter begin,
+    t_pat_iter end,
+    t_pat_iter rev_begin,
+    t_pat_iter rev_end,
+    t_rac &locations,
+    bool locate)
+{
+    size_t occs = 0;
+    occs = count_one_error_case(csa, left_window, right_window, begin, end, true, true, locations, locate);
+    bool include_middle = (rev_end - rev_begin) % 2 == 0;
+    return occs + count_one_error_case(rev_csa, left_window, right_window, rev_begin, rev_end, include_middle, false, locations, locate);
 }
 
 template <class t_csa, class t_rac>
@@ -70,10 +92,64 @@ handle_one_error(
     t_rac &locations,
     bool locate)
 {
+    return handle_one_error(csa, rev_csa, 0, csa.size() - 1, query.begin(), query.end(), rev_query.begin(), rev_query.end(), locations, locate);
+}
+///////////////////2-errors////////////////////////////////
+template <class t_csa, class t_rac, class t_pat_iter>
+typename t_csa::size_type count_two_errors_case(const t_csa &csa,
+    const t_csa &rev_csa,
+    t_pat_iter begin,
+    t_pat_iter end,
+    t_pat_iter rev_begin,
+    t_pat_iter rev_end,
+    t_rac &locations,
+    bool locate)
+{
+    typename t_csa::size_type m = end-begin;
+    typename t_csa::size_type s_1 = (m) / 3;
+    typename t_csa::size_type s_2 = m - s_1;
+
+    if (end-begin > (typename std::iterator_traits<t_pat_iter>::difference_type)csa.size())
+        return 0;
+
+    typename t_csa::char_type curr_char;
+    typename t_csa::size_type left_res = 0, right_res = 0, j=0, left_err_res = 0, right_err_res = 0, result = 0, occs = 0;
+    // size_t locations_size;
+    
+    //find SA of last third P[s_2...m]
+    backward_search(csa, 0, csa.size() - 1, begin + s_2, end, left_res, right_res);
+
+    if (left_res <= right_res){
+         //for each curr_char at index j in P[1...s_2 -1]
+        for (j = s_2 ; j > 0; j--){
+            curr_char = (typename t_csa::char_type) * (begin + j - 1);
+            //check existence of P[0...i-1]<<j<<P[i+1...m] s.t j!=i, j in alphabet
+                for (size_t i = 1; i < csa.sigma; i++){
+                    if (csa.char2comp[curr_char] != i){
+                        backward_search(csa, left_res, right_res, csa.comp2char[i], left_err_res, right_err_res);
+                        occs = handle_one_error(csa,rev_csa, left_err_res, right_err_res, begin, begin + j - 1, rev_begin, rev_end, locations,locate);
+                        result += occs;
+                }
+             }
+        //return char at j index in P to the original one
+        backward_search(csa, left_res, right_res, curr_char, left_res, right_res);
+        }
+    }
+    return result;
+}
+
+template <class t_csa, class t_rac>
+typename t_csa::size_type
+handle_two_errors(
+    const t_csa &csa,
+    const t_csa &rev_csa,
+    string query,
+    string rev_query,
+    t_rac &locations,
+    bool locate)
+{
     size_t occs = 0;
-    occs = count_one_error_case(csa, query.begin(), query.end(), query.size(), true, true, locations, locate);
-    bool include_middle = rev_query.size() % 2 == 0;
-    return occs + count_one_error_case(rev_csa, rev_query.begin(), rev_query.end(), rev_query.size(), include_middle, false, locations, locate);
+    return occs = count_two_errors_case(csa, rev_csa, query.begin(), query.end(),rev_query.begin(), rev_query.end(), locations, locate);
 }
 
 int main(int argc, char **argv)
@@ -129,11 +205,11 @@ int main(int argc, char **argv)
             cout << "ERROR: File " << argv[1] << " does not exist. Exit." << endl;
             return 1;
         }
-        // cout << "No index " << index_file << " located. Building index now." << endl;
+        cout << "No index " << index_file << " located. Building index now." << endl;
         construct(fm_index, argv[1], 1);     // generate index
         store_to_file(fm_index, index_file); // save it
     }
-    // cout << "Index construction complete, index requires " << size_in_mega_bytes(fm_index) << " MiB." << endl;
+    cout << "Index construction complete, index requires " << size_in_mega_bytes(fm_index) << " MiB." << endl;
 
     ifstream index_file_stream(argv[1]);
     string rev_index_string((istreambuf_iterator<char>(index_file_stream)), istreambuf_iterator<char>());
@@ -144,18 +220,28 @@ int main(int argc, char **argv)
 
     if (!load_from_file(rev_fm_index, rev_index_file))
     {
-        // cout << "No reversed index " << index_file << " located. Building reversed index now." << endl;
+        cout << "No reversed index " << index_file << " located. Building reversed index now." << endl;
         construct_im(rev_fm_index, rev_index_string, 1); // generate index
         store_to_file(rev_fm_index, rev_index_file);     // save it
     }
+
+    string temp_query = "bcd";
+    // size_t s, l_fwd_res, r_fwd_res, l_bwd_res, r_bwd_res;
+    // string::iterator begin = temp.begin();
+    // string::iterator end = temp.end();
+
+    // string::iterator begin = temp.begin();
+    // size_t count = 0, size = 0;
+    // size_t l_fwd_res, r_fwd_res, l_bwd_res, r_bwd_res;
+    // bidirectional_search(fm_index, 0, fm_index.size() - 1, 0, fm_index.size() - 1, 'b', l_fwd_res, r_fwd_res, l_bwd_res, r_bwd_res);
 
     bool do_locate = false;
     if (max_locations > 0)
         do_locate = true;
 
-    // cout << "Input search terms and press Ctrl-D to exit." << endl;
-    // string prompt = "\e[0;32m>\e[0m ";
-    // cout << prompt;
+    cout << "Input search terms and press Ctrl-D to exit." << endl;
+    string prompt = "\e[0;32m>\e[0m ";
+    cout << prompt;
     string query, rev_query;
     while (getline(cin, query))
     {
@@ -170,22 +256,24 @@ int main(int argc, char **argv)
         case 1:
             occs = handle_one_error(fm_index, rev_fm_index, query, rev_query, locations, do_locate);
             break;
-        case 2: // TODO
+        case 2: 
+            occs = handle_two_errors(fm_index, rev_fm_index, query, rev_query, locations, do_locate);
+            break;
         default:
             occs = sdsl::count(fm_index, query.begin(), query.end());
             locations = locate(fm_index, query.begin(), query.begin() + m);
         }
 
-        cout << query << " : " << occs << endl;
+        cout << "# of occurrences: " << occs << endl;
         if (occs > 0)
         {
-            cout << "Location and context of first occurrences:" << endl;
+            cout << "Location and context of first occurrences: " << endl;
             // TODO: Uncomment
             // auto locations = locate(fm_index, query.begin(), query.begin() + m);
             sort(locations.begin(), locations.end());
             for (size_t i = 0, pre_extract = pre_context, post_extract = post_context; i < min(occs, max_locations); ++i)
             {
-                cout << "  " << locations[i] << ": ";
+                cout << setw(8) << locations[i] << ": ";
                 if (pre_extract > locations[i])
                 {
                     pre_extract = locations[i];
@@ -201,18 +289,17 @@ int main(int argc, char **argv)
                 {
                     pre = pre.substr(pre.find_last_of('\n') + 1);
                 }
-                // cout << pre;
-                // cout << "\e[1;31m";
+                cout << pre;
+                cout << "\e[1;31m";
                 cout << s.substr(0, m);
-                // cout << "\e[0m";
-                cout << endl;
-                // string context = s.substr(m);
-                // cout << context.substr(0, context.find_first_of('\n')) << endl;
+                cout << "\e[0m";
+                string context = s.substr(m);
+                cout << context.substr(0, context.find_first_of('\n')) << endl;
             }
         }
-        // cout << prompt;
+        cout << prompt;
     }
 
     index_file_stream.close(); // TODO: Check it's fine
-    // cout << endl;
+    cout << endl;
 }
